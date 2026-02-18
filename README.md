@@ -1,2 +1,2 @@
 # my-ctf-challenges
-Collection of the CTF Challenges I have made/help made, and solutions (if applicable). Might be missing some challenges.
+Collection of the CTF challenges I have made/helped make, and solutions (if applicable). Might be missing some challenges.
