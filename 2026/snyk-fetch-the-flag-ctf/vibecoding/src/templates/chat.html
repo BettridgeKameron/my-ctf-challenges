@@ -1,0 +1,291 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Groc Code - Chat</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+</head>
+<body>
+  <div class="app-shell">
+    <div class="topbar">
+      <div class="brand">Groc Code</div>
+      <div class="user">
+        Signed in as {{ username }}
+        <button id="new-chat-btn" class="new-chat-btn">New Chat</button>
+        {% if is_admin %}
+        <a class="link" href="{{ url_for('admin') }}" style="margin-left: 16px; color: #a78bfa;">Admin Panel</a>
+        {% endif %}
+        <a class="link" href="{{ url_for('logout') }}" style="margin-left: 16px;">Logout</a>
+      </div>
+    </div>
+    <div class="content-grid">
+      <div class="chat-panel">
+        <div class="chat-wrap">
+          <div id="chat" class="chat">
+            <div class="msg assistant seed" data-seed="true">
+              <div class="bubble">Hi! I'm Groc Code, your AI assistant for game development. How can I help you today?</div>
+            </div>
+          </div>
+          <div id="chat-overlay" class="chat-overlay hidden" aria-hidden="true">
+            <div class="overlay-card">
+              <span class="spinner"></span>
+              <span>Thinking…</span>
+            </div>
+          </div>
+        </div>
+        <div class="composer">
+          <textarea id="message" rows="2" maxlength="2000" placeholder="Ask a question or request help with code..." autocomplete="off"></textarea>
+          <div class="composer-actions">
+            <div class="char-meter">
+              <div class="char-track">
+                <div id="char-fill" class="char-fill"></div>
+              </div>
+              <div id="char-remaining" class="char-remaining">2000 left</div>
+            </div>
+            <button id="send" class="primary">Send</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="welcome-modal" class="modal hidden">
+    <div class="modal-overlay"></div>
+    <div class="modal-content">
+      <div class="logo-lg">G</div>
+      <h2>Welcome to Groc Code</h2>
+      <p class="subtitle">AI-powered coding assistant for PixelForge Studios</p>
+      <div class="divider" style="margin: 20px 0;"></div>
+      <p style="color: #a1a1aa; font-size: 14px; line-height: 1.6; margin-bottom: 20px;">Groc Code helps game developers with Unity, Unreal Engine, gameplay programming, optimization, debugging, and technical documentation.</p>
+      <div class="welcome-examples">
+        <div style="font-weight: 600; margin-bottom: 12px; color: #e4e4e7; font-size: 12px; text-transform: uppercase; letter-spacing: 0.1em;">Quick Examples</div>
+        <div style="color: #a1a1aa; font-size: 13px; line-height: 1.8;">
+          • How do I optimize rendering in Unity?<br>
+          • Explain object pooling for game objects<br>
+          • Write a C# script for player movement<br>
+          • Debug my AI pathfinding code
+        </div>
+      </div>
+      <div class="modal-footer">
+        <label class="checkbox-label">
+          <input type="checkbox" id="dont-show-again">
+          <span>Don't show this again</span>
+        </label>
+        <button id="close-modal" class="primary">Got it</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/marked@11.1.1/marked.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/python.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/csharp.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/cpp.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/javascript.min.js"></script>
+  <script>
+    const chat = document.getElementById("chat");
+    const input = document.getElementById("message");
+    const send = document.getElementById("send");
+    const overlay = document.getElementById("chat-overlay");
+    const newChatBtn = document.getElementById("new-chat-btn");
+    const STORAGE_KEY = 'groc_code_chat_history';
+    const MAX_MESSAGE_LENGTH = 2000;
+    const MAX_CHAT_MESSAGES = 50;
+    const remaining = document.getElementById("char-remaining");
+    const fill = document.getElementById("char-fill");
+
+    marked.use({
+      renderer: {
+        code(code, language) {
+          if (language && hljs.getLanguage(language)) {
+            try {
+              const highlighted = hljs.highlight(code, { language: language }).value;
+              return `<pre><code class="hljs language-${language}">${highlighted}</code></pre>`;
+            } catch (err) {
+              console.error('Highlight error:', err);
+            }
+          }
+          const highlighted = hljs.highlightAuto(code).value;
+          return `<pre><code class="hljs">${highlighted}</code></pre>`;
+        }
+      },
+      breaks: true,
+      gfm: true
+    });
+
+    function addMessage(role, text, skipSave) {
+      const row = document.createElement("div");
+      row.className = "msg " + role;
+      row.setAttribute('data-text', text);
+      const bubble = document.createElement("div");
+      bubble.className = "bubble";
+      if (role === "assistant") {
+        bubble.innerHTML = marked.parse(text);
+      } else {
+        bubble.textContent = text;
+      }
+      row.appendChild(bubble);
+      chat.appendChild(row);
+      chat.scrollTop = chat.scrollHeight;
+      
+      if (!skipSave) {
+        saveChatHistory();
+      }
+    }
+
+    function saveChatHistory() {
+      const messages = [];
+      const msgElements = chat.querySelectorAll('.msg:not(.seed)');
+      msgElements.forEach(msg => {
+        const role = msg.classList.contains('user') ? 'user' : 'assistant';
+        const text = msg.getAttribute('data-text');
+        messages.push({ role, text });
+      });
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(messages));
+    }
+
+    function loadChatHistory() {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        try {
+          const messages = JSON.parse(saved);
+          messages.forEach(msg => {
+            addMessage(msg.role, msg.text, true);
+          });
+        } catch (e) {
+          console.error('Failed to load chat history:', e);
+        }
+      }
+    }
+
+    function clearChatHistory() {
+      const items = chat.querySelectorAll(".msg:not(.seed)");
+      items.forEach((el) => el.remove());
+      localStorage.removeItem(STORAGE_KEY);
+    }
+
+    function autosize(el) {
+      el.style.height = "auto";
+      const next = Math.min(el.scrollHeight, 200);
+      el.style.height = next + "px";
+    }
+
+    function updateRemaining() {
+      const len = input.value.length;
+      const left = Math.max(0, MAX_MESSAGE_LENGTH - len);
+      const used = Math.min(1, len / MAX_MESSAGE_LENGTH);
+      remaining.textContent = `${left} left`;
+      fill.style.width = `${Math.round(used * 100)}%`;
+      fill.classList.toggle("near-limit", left <= 200);
+    }
+
+    function currentChatCount() {
+      return chat.querySelectorAll(".msg:not(.seed)").length;
+    }
+
+    async function sendMessage() {
+      const text = input.value.trim();
+      if (!text) return;
+      if (text.length > MAX_MESSAGE_LENGTH) {
+        addMessage("assistant", `Message too long. Limit is ${MAX_MESSAGE_LENGTH} characters.`);
+        return;
+      }
+      if (currentChatCount() >= MAX_CHAT_MESSAGES) {
+        addMessage("assistant", "Message limit reached. You've used all 50 messages in this conversation. Please click 'New Chat' to start a fresh conversation.");
+        return;
+      }
+      input.value = "";
+      autosize(input);
+      updateRemaining();
+      addMessage("user", text);
+      send.disabled = true;
+      overlay.classList.remove("hidden");
+      try {
+        const resp = await fetch("/api/chat", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({message: text})
+        });
+        const data = await resp.json();
+        if (data.error === "rate_limited") {
+          addMessage("assistant", "Slow down! Sending messages too fast. Wait 5 seconds...");
+        } else if (data.error === "message_limit_reached") {
+          addMessage("assistant", data.reply || "Message limit reached. Please start a new chat.");
+        } else if (data.reply) {
+          addMessage("assistant", data.reply);
+        } else {
+          addMessage("assistant", "Something went wrong.");
+        }
+      } catch (e) {
+        addMessage("assistant", "Network error.");
+      } finally {
+        send.disabled = false;
+        overlay.classList.add("hidden");
+        input.focus();
+      }
+    }
+
+    send.addEventListener("click", sendMessage);
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        sendMessage();
+      }
+    });
+    input.addEventListener("input", () => {
+      autosize(input);
+      updateRemaining();
+    });
+    
+    newChatBtn.addEventListener("click", async () => {
+      if (confirm("Start a new chat? This will clear the current conversation.")) {
+        clearChatHistory();
+        try {
+          await fetch("/api/clear_chat", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"}
+          });
+        } catch (e) {
+          console.error("Failed to clear server chat:", e);
+        }
+      }
+    });
+    
+    autosize(input);
+    updateRemaining();
+    
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.has('clear') || performance.navigation.type === 1) {
+      localStorage.removeItem(STORAGE_KEY);
+    }
+    
+    loadChatHistory();
+
+    const modal = document.getElementById('welcome-modal');
+    const closeModalBtn = document.getElementById('close-modal');
+    const dontShowAgain = document.getElementById('dont-show-again');
+
+    function showWelcomeModal() {
+      const dontShow = localStorage.getItem('vibecoding_hide_welcome');
+      if (!dontShow) {
+        modal.classList.remove('hidden');
+      }
+    }
+
+    closeModalBtn.addEventListener('click', () => {
+      if (dontShowAgain.checked) {
+        localStorage.setItem('vibecoding_hide_welcome', 'true');
+      }
+      modal.classList.add('hidden');
+    });
+
+    modal.querySelector('.modal-overlay').addEventListener('click', () => {
+      modal.classList.add('hidden');
+    });
+
+    showWelcomeModal();
+  </script>
+</body>
+</html>

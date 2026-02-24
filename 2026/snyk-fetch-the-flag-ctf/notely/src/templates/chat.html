@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Notely - Chat</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <div class="app-shell">
+    <div class="topbar">
+      <div class="brand">Notely</div>
+      <div class="user">Signed in as {{ username }}</div>
+      <a class="link" href="{{ url_for('logout') }}">Logout</a>
+    </div>
+    <div class="content-grid">
+      <div class="panel info-panel">
+        <div class="logo-lg">N</div>
+        <h2>Welcome to Notely</h2>
+        <p>Notely believes any note can be achieved within 10 characters of input, over 5 messages. It is a bold reduction that makes note taking insanely fast and saves billions.</p>
+        <p class="limit-note">You get 5 messages total, 10 characters each, before the chat session restarts.</p>
+        <div class="divider"></div>
+        <div class="guide">
+          <div class="guide-title">Try asking</div>
+          <div class="guide-item">Save a note: “Quarterly goals: ship v2, land 10 pilots.”</div>
+          <div class="guide-item">Get my notes.</div>
+          <div class="guide-item">Update your note with new content.</div>
+        </div>
+      </div>
+      <div class="panel chat-panel">
+        <div class="chat-wrap">
+          <div id="chat" class="chat">
+            <div class="msg assistant seed" data-seed="true">
+              <div class="bubble">Hi, I’m Notely. I’m ready when you are.</div>
+            </div>
+          </div>
+          <div id="chat-overlay" class="chat-overlay hidden" aria-hidden="true">
+            <div class="overlay-card">
+              <span class="spinner"></span>
+              <span>Thinking…</span>
+            </div>
+          </div>
+        </div>
+        <div class="composer">
+          <textarea id="message" rows="3" maxlength="10" placeholder="Ask Notely to get or save a note" autocomplete="off"></textarea>
+          <div class="composer-actions">
+            <div class="char-meter">
+              <div class="char-track">
+                <div id="char-fill" class="char-fill"></div>
+              </div>
+              <div id="char-remaining" class="char-remaining">10 left</div>
+            </div>
+            <button id="send" class="primary">Send</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script>
+    const chat = document.getElementById("chat");
+    const input = document.getElementById("message");
+    const send = document.getElementById("send");
+    const overlay = document.getElementById("chat-overlay");
+    const MAX_MESSAGE_LENGTH = 10;
+    const MAX_CHAT_MESSAGES = 10;
+    const remaining = document.getElementById("char-remaining");
+    const fill = document.getElementById("char-fill");
+
+    function addMessage(role, text) {
+      const row = document.createElement("div");
+      row.className = "msg " + role;
+      const bubble = document.createElement("div");
+      bubble.className = "bubble";
+      bubble.textContent = text;
+      row.appendChild(bubble);
+      chat.appendChild(row);
+      chat.scrollTop = chat.scrollHeight;
+    }
+
+    function autosize(el) {
+      el.style.height = "auto";
+      const next = Math.min(el.scrollHeight, 200);
+      el.style.height = next + "px";
+    }
+
+    function updateRemaining() {
+      const len = input.value.length;
+      const left = Math.max(0, MAX_MESSAGE_LENGTH - len);
+      const used = Math.min(1, len / MAX_MESSAGE_LENGTH);
+      remaining.textContent = `${left} left`;
+      fill.style.width = `${Math.round(used * 100)}%`;
+      fill.classList.toggle("near-limit", left <= 20);
+    }
+
+    function currentChatCount() {
+      return chat.querySelectorAll(".msg:not(.seed)").length;
+    }
+
+    function clearChat() {
+      const items = chat.querySelectorAll(".msg:not(.seed)");
+      items.forEach((el) => el.remove());
+    }
+
+    function restartChatWithCountdown() {
+      let remaining = 3;
+      addMessage("assistant", `Too many messages in the chat! Restarting chat... ${remaining}`);
+      input.disabled = true;
+      send.disabled = true;
+      const timer = setInterval(() => {
+        remaining -= 1;
+        const last = chat.querySelector(".msg.assistant:last-child .bubble");
+        if (!last) return;
+        if (remaining > 0) {
+          last.textContent = `Too many messages in the chat! Restarting chat... ${remaining}`;
+        } else {
+          clearInterval(timer);
+          clearChat();
+          input.disabled = false;
+          send.disabled = false;
+          input.focus();
+          updateRemaining();
+        }
+      }, 1000);
+    }
+
+    async function sendMessage() {
+      const text = input.value.trim();
+      if (!text) return;
+      if (text.length > MAX_MESSAGE_LENGTH) {
+        addMessage("assistant", `Message too long. Limit is ${MAX_MESSAGE_LENGTH} characters.`);
+        return;
+      }
+      if (currentChatCount() >= MAX_CHAT_MESSAGES) {
+        restartChatWithCountdown();
+        return;
+      }
+      input.value = "";
+      autosize(input);
+      addMessage("user", text);
+      send.disabled = true;
+      overlay.classList.remove("hidden");
+      try {
+        const resp = await fetch("/api/chat", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({message: text})
+        });
+        const data = await resp.json();
+        if (data.error === "rate_limited") {
+          addMessage("assistant", "Slow down! Sending messages too fast. Wait 5 seconds...");
+        } else if (data.reply) {
+          addMessage("assistant", data.reply);
+        } else {
+          addMessage("assistant", "Something went wrong.");
+        }
+      } catch (e) {
+        addMessage("assistant", "Network error.");
+      } finally {
+        send.disabled = false;
+        overlay.classList.add("hidden");
+        input.focus();
+        updateRemaining();
+        if (currentChatCount() >= MAX_CHAT_MESSAGES) {
+          restartChatWithCountdown();
+        }
+      }
+    }
+
+    send.addEventListener("click", sendMessage);
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        sendMessage();
+      }
+    });
+    input.addEventListener("input", () => {
+      autosize(input);
+      updateRemaining();
+    });
+    autosize(input);
+    updateRemaining();
+  </script>
+</body>
+</html>

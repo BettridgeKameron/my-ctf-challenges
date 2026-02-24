@@ -1,0 +1,39 @@
+services:
+  app:
+    build:
+      context: ./app
+    hostname: app
+    networks:
+      - internal
+
+  renderer:
+    build:
+      context: ./renderer
+      args:
+        - FLAG_PART1=${FLAG_PART1}
+    hostname: renderer
+    networks:
+      - internal
+
+  waf:
+    build:
+      context: ./waf
+    ports:
+      - "8000:8000"
+    depends_on:
+      - app
+      - renderer
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - WAF_MODEL=${WAF_MODEL}
+      - DISABLE_INBOUND_WAF=${DISABLE_INBOUND_WAF:-0}
+      - DISABLE_OUTBOUND_WAF=${DISABLE_OUTBOUND_WAF:-0}
+      - BACKEND_URL=http://app:8000
+      - FLAG_PART2=${FLAG_PART2}
+      - FLAG_PART3=${FLAG_PART3}
+    networks:
+      - internal
+
+networks:
+  internal:
+    driver: bridge

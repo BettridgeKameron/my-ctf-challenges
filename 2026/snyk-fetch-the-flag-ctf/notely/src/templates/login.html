@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Notely - Login</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <div class="auth-shell">
+    <div class="auth-card">
+      <div class="brand-row">
+        <div class="logo">N</div>
+        <div>
+          <h1>Notely</h1>
+          <p class="subtitle">Your lightweight AI notes companion</p>
+        </div>
+      </div>
+      {% if error %}
+      <div class="error">{{ error }}</div>
+      {% endif %}
+      <form method="post" class="form">
+        <label>
+          <span>Username</span>
+          <input type="text" name="username" autocomplete="username" minlength="5" maxlength="255" required>
+        </label>
+        <label>
+          <span>Password</span>
+          <input type="password" name="password" autocomplete="current-password" minlength="5" maxlength="255" required>
+        </label>
+        <button type="submit" class="primary">Login</button>
+      </form>
+      <div class="foot">
+        <span>New here?</span>
+        <a href="{{ url_for('register') }}">Create an account</a>
+      </div>
+    </div>
+    <div class="auth-side">
+      <div class="side-card">
+        <h2>AI first, minimal friction</h2>
+        <p>Notely believes any note can be achieved within 10 characters of input, over 5 messages. This reduction makes note taking insanely fast and saves billions.</p>
+        <p class="limit-note">Limits: 5 messages, 10 characters each.</p>
+        <div class="chips">
+          <span>Fast</span>
+          <span>Minimal</span>
+          <span>Focused</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Groc Code - Login</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <script>
+    localStorage.removeItem('groc_code_chat_history');
+  </script>
+</head>
+<body>
+  <div class="auth-shell">
+    <div class="auth-card">
+      <div class="brand-row">
+        <div class="logo">G</div>
+        <div>
+          <h1>Groc Code</h1>
+          <p class="subtitle">PixelForge Studios · AI Coding Assistant</p>
+        </div>
+      </div>
+      {% if error %}
+      <div class="error">{{ error }}</div>
+      {% endif %}
+      <form class="form" method="post">
+        <label>
+          <span>Username</span>
+          <input type="text" name="username" autocomplete="username" required autofocus>
+        </label>
+        <label>
+          <span>Password</span>
+          <input type="password" name="password" autocomplete="current-password" required>
+        </label>
+        <button type="submit" class="primary">Sign In</button>
+      </form>
+      <div class="foot">
+        <div style="margin-top: 24px; padding-top: 24px; border-top: 1px solid #27272a;">
+          <div class="chips">
+            <span>Unity</span>
+            <span>Unreal</span>
+            <span>C++</span>
+            <span>C#</span>
+            <span>Python</span>
+            <span>AI</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
