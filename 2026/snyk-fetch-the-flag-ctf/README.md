@@ -2,6 +2,8 @@
 These are all the AI/Web challenges that I have made. Official solutions are in the relevant directories.
 If you want to see different solutions, `adragos` from `WreckTheLine` made a really good writeup of the challenges over at https://adragos.ro/snyk-ctf-2026/!
 
+Also if you are new to Direct/Indirect prompt injection, this interview I made with NahamSec is a great watch! https://www.youtube.com/watch?v=xy1vQOHGQQY
+
 ## Note on Solutions
 Since these are using live gpt-5-nano, and due to the nature of LLMs, these and any LLM challenge solution can stop working in the future (think of how currently undetectable malware can be detected later and prevented).
 
